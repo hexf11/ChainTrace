@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>链序 ChainTrace · RPC 设置</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <main>
+    <div class="brand">链序 <span>ChainTrace</span></div>
+    <h1>RPC 设置</h1>
+      <form id="settings">
+        <label for="rpc">Solana 主网 RPC URL</label>
+        <input id="rpc" type="url" required autocomplete="off" spellcheck="false" placeholder="https://api.mainnet-beta.solana.com">
+        <p class="hint">仅保存在当前浏览器，保存后自动生效。</p>
+        <div class="buttons">
+          <button type="submit" id="save">保存并授权</button>
+          <button type="button" id="test" class="secondary" title="测试已保存的 RPC">测试连接</button>
+          <button type="button" id="reset" class="text">恢复默认</button>
+        </div>
+      </form>
+      <p id="status" role="status" aria-live="polite"></p>
+  </main>
+  <script src="options.js"></script>
+</body>
+</html>

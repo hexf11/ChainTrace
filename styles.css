@@ -1,0 +1,22 @@
+.gsi-column{box-sizing:border-box!important;flex:0 0 182px!important;width:182px!important;min-width:182px!important;display:flex!important;align-items:center;gap:7px;padding:0 8px;font:12px/16px ui-monospace,monospace;color:#9da6b7;white-space:nowrap;overflow:hidden}
+.gsi-column[data-state="done"] .gsi-value{color:#73e6b5}
+.gsi-column[data-state="error"] .gsi-value{color:#f3aa6d;cursor:help}
+.gsi-value{overflow:hidden;text-overflow:ellipsis}
+.gsi-row>[data-testid^="table-cell-"]{min-width:0!important;flex-shrink:1!important}
+.gsi-head>[data-testid^="table-sort-"]{min-width:0!important;flex-shrink:1!important}
+[data-gsi-second-match="true"]{box-shadow:inset 3px 0 #73e6b5;background:rgba(70,184,125,.10)!important}
+[data-gsi-tx-group]{--gsi-group-rgb:113,198,255;--gsi-group-top:0px;--gsi-group-bottom:0px;--gsi-group-color:rgb(var(--gsi-group-rgb));border-radius:0!important;background-image:linear-gradient(rgba(var(--gsi-group-rgb),.06),rgba(var(--gsi-group-rgb),.06))!important;box-shadow:inset 2px 0 var(--gsi-group-color),inset -2px 0 var(--gsi-group-color),inset 0 var(--gsi-group-top) var(--gsi-group-color),inset 0 var(--gsi-group-bottom) var(--gsi-group-color),var(--gsi-second-shadow,0 0 transparent)!important}
+[data-gsi-group-tone="1"]{--gsi-group-rgb:180,157,255}
+[data-gsi-group-tone="2"]{--gsi-group-rgb:103,215,194}
+[data-gsi-group-tone="3"]{--gsi-group-rgb:232,195,121}
+[data-gsi-group-tone="4"]{--gsi-group-rgb:141,170,255}
+[data-gsi-group-edge="start"]{--gsi-group-top:2px;border-radius:6px 6px 0 0!important}
+[data-gsi-group-edge="end"]{--gsi-group-bottom:-2px;border-radius:0 0 6px 6px!important}
+[data-gsi-group-edge="single"]{--gsi-group-top:2px;--gsi-group-bottom:-2px;border-radius:6px!important}
+[data-gsi-tx-group][data-gsi-second-match="true"]{--gsi-second-shadow:inset 5px 0 #73e6b5}
+[data-gsi-tx-group] .gsi-column{flex-direction:column;align-items:flex-start;justify-content:center;gap:1px}
+[data-gsi-tx-group] .gsi-column[data-state="done"] .gsi-value{color:var(--gsi-group-color)}
+.gsi-group-label{color:var(--gsi-group-color);font:10px/12px system-ui,sans-serif;white-space:nowrap}
+[data-gsi-group-kind="bundle"]{--gsi-group-rgb:255,194,92}
+.gsi-group-label[href]{text-decoration:none}
+.gsi-group-label[href]:hover{text-decoration:underline}

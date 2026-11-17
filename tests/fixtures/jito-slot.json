@@ -1,0 +1,63 @@
+[
+  {
+    "bundleId": "203c663ffeb7142aeeeeb4cf7c28196a3294b346d5eaaf15a222ac95ab25edd5",
+    "slot": 470558016,
+    "validator": "7jtWrBuj9k2E5RnoHGWSBosBwqwjZMvEnhe9qGLJdhT4",
+    "tippers": [
+      "GMU8FuZyLX4LtbNMFmGXGKyttMXdUxot3Ceya1Fa8ugm"
+    ],
+    "landedTipLamports": 34303,
+    "landedCu": 129395,
+    "blockIndex": 47,
+    "timestamp": "2026-11-17T13:55:01+00:00",
+    "txSignatures": [
+      "3oJU7FuUWgHBFUDuxY241wNEcj8wjGHTQpeeesb6tte9kBt5uKnc3sT69vP6UrTYzPQPGpewiKvSADtUMtzWYV5m"
+    ]
+  },
+  {
+    "bundleId": "e58205a2eb87b85d53e3a6361b95d2080c6bb991b56ed5f695fd95cf626ed2cd",
+    "slot": 470558016,
+    "validator": "7jtWrBuj9k2E5RnoHGWSBosBwqwjZMvEnhe9qGLJdhT4",
+    "tippers": [
+      "DGcyWa3GxL4F4BcqDgHPF49qNYLE3JYocfK3yWTLaoCd"
+    ],
+    "landedTipLamports": 1000,
+    "landedCu": 72548,
+    "blockIndex": 106,
+    "timestamp": "2026-11-17T13:55:01+00:00",
+    "txSignatures": [
+      "2wiaCNGSUQ8g5xPFC332BGKJwF9u9DczmmFBQyLNAmjSeMGc6rjEjzDyQRtjxSMBefyr49gcnuQWKoLSomJ7Z6ds"
+    ]
+  },
+  {
+    "bundleId": "7ada81d4a3d4c9dec034407716700eb7c227ee7a4e00468188781fb76cf5ab3a",
+    "slot": 470558016,
+    "validator": "7jtWrBuj9k2E5RnoHGWSBosBwqwjZMvEnhe9qGLJdhT4",
+    "tippers": [
+      "MfDuWeqSHEqTFVYZ7LoexgAK9dxk7cy4DFJWjWMGVWa"
+    ],
+    "landedTipLamports": 4563,
+    "landedCu": 56875,
+    "blockIndex": 167,
+    "timestamp": "2026-11-17T13:55:01+00:00",
+    "txSignatures": [
+      "dMMSDpmCwW7y29EKKxrCg9UEYBMwTmexaow9NRSVyhgP4pJrECBoDL6DxhgNov2kbeB3Ed5uQ44HCGHRuK5qErT"
+    ]
+  },
+  {
+    "bundleId": "389c57c985e97eac2881a62cafd10245fb4ee81d420004b454442b057788ba86",
+    "slot": 470558016,
+    "validator": "7jtWrBuj9k2E5RnoHGWSBosBwqwjZMvEnhe9qGLJdhT4",
+    "tippers": [
+      "8cMy4EPrSAruHZH32GSCtonfotKnaBY58GJ2E26zAji7"
+    ],
+    "landedTipLamports": 9776,
+    "landedCu": 35495,
+    "blockIndex": 222,
+    "timestamp": "2026-11-17T13:55:01+00:00",
+    "txSignatures": [
+      "5Whxtd2SBK4TP5PEL7q7n7UQqyX7jNjjz7mqEG99XdrSCqdhe2omaNJJLEt5zZ3NxnKC7iY7mPpU6ir8rRCFZ23o",
+      "5WvRQNNoCjXyY5vxksKTRdsqHzmkKG1GrpUpa9H6x22WrYz26iw72unvesnN5Z4NG2SPcrFGdTfypVF3zqwPW24D"
+    ]
+  }
+]

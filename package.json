@@ -1,0 +1,27 @@
+{
+  "name": "chaintrace-chrome-extension",
+  "version": "1.4.0",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/core.test.cjs",
+    "test:browser": "node tests/browser.cjs && node tests/bundles-browser.cjs",
+    "check": "node --check background.js && node --check content.js && node --check page.js && node --check options.js",
+    "package": "python3 scripts/package.py"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  },
+  "description": "Automatic Solana transaction positions and verified Jito bundle highlighting on GMGN.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hexf11/ChainTrace.git"
+  },
+  "bugs": {
+    "url": "https://github.com/hexf11/ChainTrace/issues"
+  },
+  "homepage": "https://github.com/hexf11/ChainTrace#readme",
+  "engines": {
+    "node": ">=22"
+  }
+}
