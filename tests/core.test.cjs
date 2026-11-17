@@ -27,10 +27,10 @@ test('bundle evidence requires every member in the same finalized block in sourc
     [record, {id: 'b'.repeat(64), slot: 1, signatures: [B, C]}]]) {
     assert.equal(page.verifiedBundleMembers(records, 1, indexes).size, 0);
   }
-  assert.equal(page.verifiedBundleMembers([{...record, signatures: [A]}], 1, indexes).size, 1);
+  assert.equal(page.verifiedBundleMembers([{...record, signatures: [A]}], 1, indexes).size, 0);
 });
 
-test('confirmed bundle frames span distinct transaction indexes and label partial visibility', () => {
+test('confirmed bundle frames require at least two distinct visible activity transactions', () => {
   const bundle = {id: bundleID, slot: 1, signatures: [A, B, C]};
   const entries = [
     {state: 'done', slot: 1, index: 10, signature: A, bundle},
@@ -43,8 +43,29 @@ test('confirmed bundle frames span distinct transaction indexes and label partia
   assert.equal(groups[0].kind, 'bundle');
   assert.equal(groups[0].visibleTransactions, 2);
   assert.equal(groups[0].bundle.signatures.length, 3);
-  assert.equal(page.transactionGroups(entries.slice(0, 1))[0].kind, 'bundle');
+  assert.equal(page.transactionGroups(entries.slice(0, 1))[0], null);
   assert.equal(page.transactionGroups([{...entries[0], signature: '5'.repeat(88)}])[0], null);
+});
+
+test('single Jito submissions and a trade with an off-list tip are not activity bundles', () => {
+  const fixture = require('./fixtures/jito-slot.json');
+  const records = background.normalizeBundles(fixture, 470558016);
+  const indexes = new Map(fixture.flatMap(record => record.txSignatures).map((sig, i) => [sig, i]));
+  const members = page.verifiedBundleMembers(records, 470558016, indexes);
+  assert.equal(members.size, 2);
+  for (const record of records.filter(record => record.signatures.length === 1)) {
+    assert.equal(members.has(record.signatures[0]), false);
+  }
+
+  const entry = {state: 'done', slot: 1, index: 10, signature: A};
+  for (const signatures of [[A], [A, A], [A, B]]) {
+    const result = {...entry, bundle: {id: bundleID, slot: 1, signatures}};
+    assert.deepEqual(page.transactionGroups([result]), [null]);
+    const duplicates = page.transactionGroups([result, result]);
+    assert(duplicates.every(group => group.kind === 'transaction'));
+    assert.equal(duplicates[0].count, 2);
+    assert.deepEqual(page.transactionGroups([result, {...entry, signature: C, index: 12}]), [null, null]);
+  }
 });
 
 test('groups require a completed exact Slot/Index match, including index zero', () => {

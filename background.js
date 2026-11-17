@@ -89,7 +89,9 @@ async function rpcRequest(data, revision) {
   } finally { clearTimeout(timer); inFlight--; }
 }
 
-// These are landed bundle records from Jito Explorer's own public index.
+// Jito Explorer's index includes single-transaction submissions. Preserve them
+// for conflict checks; the page separately verifies multi-transaction evidence
+// and requires two distinct activity transactions before drawing a bundle frame.
 // Do not infer bundle membership from tips, neighboring indexes, or shared slots.
 function normalizeBundles(payload, slot) {
   if (!Array.isArray(payload) || payload.length > 5000) throw new Error('Jito 索引响应格式已变化，暂不标记 bundle');

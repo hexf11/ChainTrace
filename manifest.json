@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "链序 ChainTrace",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "自动查询 GMGN 活动的 Slot / Index，核对 Jito bundle 归属并加框，支持 1s K 线联动。",
   "minimum_chrome_version": "111",
   "permissions": [

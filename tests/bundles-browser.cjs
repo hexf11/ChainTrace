@@ -10,7 +10,7 @@ const [A, B, C, D, E, F, G, H, I, J, K, L, M, N] = signatures;
 const blocks = new Map([[900, [A, B, C, D]], [901, [E, F]], [902, [G, H]], [903, [I, J]], [904, [K, L]], [905, [M, N]]]);
 const slots = new Map([...blocks].flatMap(([slot, txs]) => txs.map(sig => [sig, slot])));
 const record = (slot, id, txs) => ({bundleId: id.repeat(64), slot, timestamp: '2026-11-17T13:55:01Z', txSignatures: txs});
-const data = new Map([[900, [record(900, 'a', [A, B, C])]], [901, [record(901, 'b', [E, signatures[19]])]],
+const data = new Map([[900, [record(900, 'a', [A, B, C]), record(900, 'f', [D])]], [901, [record(901, 'b', [E, signatures[19]])]],
   [902, []], [903, [record(904, 'c', [I, J])]], [904, [record(904, 'd', [K, L])]], [905, [record(905, 'e', [M, N])]]]);
 const rowHTML = (sig, index) => `<div class="row" data-testid="token-detail-activity-row"><div data-testid="table-cell-timestamp"><a href="https://solscan.io/tx/${sig}">活动 ${index + 1}</a></div><div>买入</div></div>`;
 const fixture = txs => `<!doctype html><meta charset="utf-8"><style>body{background:#0c1016;color:#eee;padding:30px;font:14px system-ui}h1{font-size:20px}.g-table-wrapper{width:800px}.row,.head{display:flex;align-items:center;height:48px;border-bottom:1px solid #334}.row>:first-child,.head>:first-child{width:150px}a{color:#8ac}.g-table-recycler-scroll{height:350px;overflow:auto}</style><h1>Jito Bundle 自动识别（测试数据）</h1><div class="g-table-wrapper" data-sentry-component="TableNew"><div class="head"><div data-testid="table-sort-timestamp">时间</div><div>交易</div></div><div class="g-table-recycler-scroll">${txs.map(rowHTML).join('')}</div></div>`;
@@ -66,12 +66,51 @@ const fixture = txs => `<!doctype html><meta charset="utf-8"><style>body{backgro
     await setRows([B, D, A]);
     assert.deepEqual(await page.locator('.row').evaluateAll(rows => rows.map(row => row.dataset.gsiGroupEdge || null)), ['single', null, 'single']);
     await setRows([C]);
-    await page.waitForFunction(() => document.querySelector('.gsi-group-label')?.textContent === 'Jito Bundle · 1/3 笔');
+    await page.locator('.gsi-group-label').waitFor({state: 'detached'});
+    assert.equal(await page.locator('[data-gsi-group-kind="bundle"]').count(), 0);
+    await setRows([C, A]);
+    await page.waitForFunction(() => document.querySelector('.gsi-group-label')?.textContent === 'Jito Bundle · 2/3 笔');
     assert.equal(lookups.filter(slot => slot === 900).length, 1);
     await open([A, B]);
     await page.waitForFunction(() => document.querySelectorAll('[data-gsi-group-kind="bundle"]').length === 2);
     assert.equal(lookups.filter(slot => slot === 900).length, 1);
-    console.log('PASS separated segments, later visible member and background cache across page reload');
+    await page.locator('.g-table-recycler-scroll').evaluate(scroller => {
+      scroller.style.height = '48px'; scroller.dispatchEvent(new Event('scroll'));
+    });
+    await page.waitForFunction(() => document.querySelectorAll('[data-gsi-group-kind="bundle"]').length === 0);
+    await page.locator('.g-table-recycler-scroll').evaluate(scroller => {
+      scroller.style.height = '350px'; scroller.dispatchEvent(new Event('scroll'));
+    });
+    await page.waitForFunction(() => document.querySelectorAll('[data-gsi-group-kind="bundle"]').length === 2);
+    console.log('PASS frames clear with only one visible member and return with two distinct members');
+
+    // Two independent single-transaction Jito records are never a multi-trade bundle.
+    const [O, P, Q, R] = signatures.slice(14, 18);
+    blocks.set(907, [O, P]); slots.set(O, 907); slots.set(P, 907);
+    data.set(907, [record(907, '1', [O]), record(907, '2', [P])]);
+    await open([O, O, P]);
+    await page.waitForFunction(() => document.querySelector('.row .gsi-value')?.title.includes('未查到可确认'));
+    assert.equal(await page.locator('[data-gsi-group-kind="bundle"]').count(), 0);
+    assert.equal(await page.locator('.gsi-group-label').innerText(), '同笔 · 2 条');
+
+    // A swap plus a separate tip has two signatures, but only one activity trade.
+    blocks.set(908, [Q, R]); slots.set(Q, 908); slots.set(R, 908);
+    data.set(908, [record(908, '3', [Q, R])]);
+    await open([Q, Q]);
+    const settings = await context.newPage();
+    await settings.goto(`chrome-extension://${extensionId}/options.html`);
+    const evidence = await settings.evaluate(() => chrome.runtime.sendMessage({type: 'bundles', slot: 908}));
+    assert.equal(evidence.ok, true);
+    await page.waitForFunction(() => {
+      const title = document.querySelector('.row .gsi-value')?.title || '';
+      return title.includes('Slot 908') && !title.includes('Jito Bundle：');
+    });
+    assert.equal(await page.locator('[data-gsi-group-kind="bundle"]').count(), 0);
+    assert.equal(await page.locator('.gsi-group-label').innerText(), '同笔 · 2 条');
+    await setRows([Q]);
+    await page.locator('.gsi-group-label').waitFor({state: 'detached'});
+    assert.equal(await page.locator('[data-gsi-group-kind="bundle"]').count(), 0);
+    console.log('PASS single Jito records, duplicate activity rows and trade-plus-tip do not produce bundle frames');
 
     await open([E, F]);
     await page.waitForFunction(() => document.querySelector('.row .gsi-value')?.title.includes('未查到可确认'));
@@ -105,8 +144,6 @@ const fixture = txs => `<!doctype html><meta charset="utf-8"><style>body{backgro
     assert.equal(await page.locator('.row .gsi-value').innerText(), '906 / 0');
     assert.equal(await page.locator('[data-gsi-group-kind="bundle"]').count(), 0);
     assert.equal(await page.locator('#gsi-panel, #gsi-launcher, .gsi-column input').count(), 0);
-    const settings = await context.newPage();
-    await settings.goto(`chrome-extension://${extensionId}/options.html`);
     const invalid = await settings.evaluate(() => chrome.runtime.sendMessage({type: 'bundles', slot: 'https://evil.example/'}));
     assert.equal(invalid.ok, false); assert.match(invalid.error, /Slot/);
     assert.deepEqual(errors, []);

@@ -15,8 +15,9 @@
 - 页面中可见的交易依次自动查询，滚动到新交易会继续查询。
 - 切换到 1s K 线，点击蜡烛图即可自动定位和查询该秒的活动。
 - 「同笔」框表示相同 Slot / Index 的多条活动记录。
-- 金色「Jito Bundle」框表示 Jito 索引明确收录、且完整成员与区块核对通过的交易组。
-- 点击 Jito Bundle 标记可打开 Jito Explorer。没有标记表示尚未确认归属。
+- 金色「Jito Bundle」框要求归属与区块核对通过，且当前活动列表可见至少两笔不同交易。
+- 单笔提交、只有一笔活动的「交易 + 独立 tip」及重复活动不作为多笔活动加框；只可见一笔包内成员时也不画框。
+- 点击标记可打开 Jito Explorer。没有标记可能是尚未确认归属或当前可见成员不足。
 
 默认公共 RPC 可能限流或缺少历史数据。自定义主网节点需支持 `getGenesisHash`、
 `getSignatureStatuses`、`getTransaction` 和 `getBlock`。

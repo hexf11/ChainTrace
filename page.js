@@ -308,7 +308,9 @@
     }
     const members = new Map();
     for (const record of candidates.values()) {
-      if (conflicts.has(record.id)) continue;
+      // Jito also indexes single-transaction submissions. Keep them in conflict
+      // checks above, but never promote them to multi-transaction evidence.
+      if (conflicts.has(record.id) || record.signatures.length < 2) continue;
       for (const sig of record.signatures) members.set(sig, record);
     }
     return members;
@@ -320,8 +322,21 @@
     const valid = entries.map(result => result?.state === 'done'
       && Number.isSafeInteger(result.slot) && result.slot >= 0
       && Number.isSafeInteger(result.index) && result.index >= 0);
-    const bundles = entries.map((result, i) => valid[i] && result.bundle?.slot === result.slot
-      && /^[a-f0-9]{64}$/.test(result.bundle.id) && result.bundle.signatures?.includes(result.signature) ? result.bundle : null);
+    const candidates = entries.map((result, i) => valid[i] && result.bundle?.slot === result.slot
+      && /^[a-f0-9]{64}$/.test(result.bundle.id) && Array.isArray(result.bundle.signatures)
+      && result.bundle.signatures.length >= 2 && result.bundle.signatures.length <= 5
+      && new Set(result.bundle.signatures).size === result.bundle.signatures.length
+      && result.bundle.signatures.includes(result.signature) ? result.bundle : null);
+    // A trade plus a separate tip is a two-signature submission, but it is not
+    // two trades in this activity list. Require two distinct visible signatures;
+    // duplicated activity rows never count as a second transaction.
+    const visibleMembers = new Map();
+    candidates.forEach((bundle, i) => {
+      if (!bundle) return;
+      if (!visibleMembers.has(bundle.id)) visibleMembers.set(bundle.id, new Set());
+      visibleMembers.get(bundle.id).add(entries[i].signature);
+    });
+    const bundles = candidates.map(bundle => bundle && visibleMembers.get(bundle.id).size >= 2 ? bundle : null);
     const keys = entries.map((result, i) => !valid[i] ? null
       : bundles[i] ? `bundle:${bundles[i].id}` : `${result.slot}:${result.index}`);
     const counts = new Map(), transactions = new Map();
@@ -775,10 +790,11 @@
   }
   function paintGroups() {
     const rows = [...document.querySelectorAll(ROW)];
+    const visible = new Set(visibleRows());
     const lists = new Map(), groups = new Map();
     for (const row of rows) {
+      if (!visible.has(row)) continue;
       const rect = row.getBoundingClientRect();
-      if (!rect.width || !rect.height) continue;
       const list = row.closest('.g-table-recycler-scroll') || row.closest('[data-sentry-component="TableNew"]')
         || row.closest('.g-table-wrapper') || row.parentElement;
       if (!lists.has(list)) lists.set(list, []);
@@ -799,7 +815,7 @@
       row.dataset.gsiGroupTone = String(group.tone);
       row.dataset.gsiGroupKind = group.kind;
       const title = group.bundle
-        ? `Jito 官方索引已记录此 bundle，全部成员已与 Slot ${group.bundle.slot} 的区块签名列表核对。\nBundle ID: ${group.bundle.id}\n本包共 ${group.bundle.signatures.length} 笔，当前列表显示 ${group.visibleTransactions} 笔（${group.count} 条活动）。点击查看来源。`
+        ? `当前列表至少两笔不同交易属于同一个 Jito 包，全部成员已与 Slot ${group.bundle.slot} 的区块签名列表核对。\nBundle ID: ${group.bundle.id}\n本包共 ${group.bundle.signatures.length} 笔（可能含独立 tip），当前列表显示 ${group.visibleTransactions} 笔（${group.count} 条活动）。此标记不判断钱包关联或交易意图。点击查看来源。`
         : `当前列表 ${group.count} 条活动属于同一笔链上交易（Slot / Index 相同）。此分组不代表已确认的 bundle。`;
       const value = column.querySelector('.gsi-value');
       value.title += `\n${title}`;
