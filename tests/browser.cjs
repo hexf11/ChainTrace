@@ -40,13 +40,16 @@ new TradingView.widget({container:'chart'});
     channel: 'chromium', headless: true, viewport: {width: 1280, height: 900},
     args: [`--disable-extensions-except=${root}`, `--load-extension=${root}`],
   });
-  const errors = [], calls = [];
-  let rpcActive = 0, maxRpcActive = 0, failBlock = false, delayedBlock = null;
+  const errors = [], calls = [], bundleCalls = [];
+  let rpcActive = 0, maxRpcActive = 0, failBlock = false, delayedBlock = null, staleRateLimit = false;
   context.on('page', page => page.on('pageerror', error => errors.push(error.message)));
   try {
     const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker', {timeout: 15000});
     const id = new URL(worker.url()).host;
-    await context.route('https://bundles.jito.wtf/**', route => route.fulfill({json: []}));
+    await context.route('https://bundles.jito.wtf/**', route => {
+      bundleCalls.push(route.request().url());
+      return route.fulfill({json: []});
+    });
     await context.route('https://api.mainnet-beta.solana.com/**', async route => {
       const data = route.request().postDataJSON();
       calls.push({url: route.request().url(), ...data});
@@ -56,6 +59,11 @@ new TradingView.widget({container:'chart'});
       else if (data.method === 'getSignatureStatuses') result = {value: data.params[0].map(sig => ({slot: sig === E ? 789 : sig === F ? 999 : 456, confirmationStatus: 'finalized'}))};
       else if (data.method === 'getBlock') {
         if (data.params[0] === 789 && delayedBlock) await delayedBlock;
+        if (data.params[0] === 789 && staleRateLimit) {
+          await route.fulfill({status: 429, body: 'Too many requests'});
+          rpcActive--;
+          return;
+        }
         if (data.params[0] === 999 && failBlock) {
           failBlock = false;
           await route.fulfill({json: {jsonrpc: '2.0', id: data.id, error: {code: -32004, message: 'Block not available'}}});
@@ -89,14 +97,40 @@ new TradingView.widget({container:'chart'});
       scroller.scrollTop = 0;
     }, {signatures, compact});
     await page.goto(`https://gmgn.ai/sol/token/${token}`);
-    // No clicks, checkboxes or switches: all visible rows must fill themselves.
+    const start = page.locator('.head .gsi-start-query');
+    await start.waitFor();
+    await page.evaluate(() => {
+      const scroller = document.querySelector('.g-table-recycler-scroll');
+      [...scroller.children].reverse().forEach(row => scroller.append(row));
+      scroller.dispatchEvent(new Event('scroll'));
+      window.headerClicks = 0;
+      document.querySelector('.head').addEventListener('click', () => window.headerClicks++);
+    });
+    await page.evaluate(second => testCrossHair({time: second}), second);
+    await page.frameLocator('#tradingview_fixture').locator('canvas').click({position: {x: 40, y: 40}});
+    // Cross a periodic refresh while sorting/scrolling and clicking a candle.
+    await page.waitForTimeout(1700);
+    assert.equal(calls.length, 0);
+    assert.equal(bundleCalls.length, 0);
+    assert.equal(await page.locator('[data-gsi-second-match="true"]').count(), 0);
+    await fs.mkdir(path.join(root, 'test-results'), {recursive: true});
+    await page.locator('.g-table-wrapper').screenshot({path: path.join(root, 'test-results/start-query.png')});
+    await start.click();
     await completed(3);
-    assert.deepEqual(await page.locator('.row .gsi-value').allTextContents(), ['456 / 1', '456 / 2', '456 / 0']);
+    assert.equal(await start.innerText(), '已开启');
+    assert.equal(await start.isDisabled(), true);
+    assert.equal(await page.evaluate(() => window.headerClicks), 0);
+    assert.deepEqual(calls.find(call => call.method === 'getSignatureStatuses').params[0], [C, B, A]);
+    assert.deepEqual(await page.locator('.row .gsi-value').allTextContents(), ['456 / 0', '456 / 2', '456 / 1']);
+    await page.evaluate(() => {
+      const scroller = document.querySelector('.g-table-recycler-scroll');
+      [...scroller.children].reverse().forEach(row => scroller.append(row));
+    });
     assert.equal(await page.locator('#gsi-panel, #gsi-launcher, .gsi-column input').count(), 0);
     assert.equal(calls.filter(call => call.method === 'getBlock').length, 1);
     assert.equal(calls.find(call => call.method === 'getBlock').params[1].transactionDetails, 'signatures');
     assert.equal(await page.locator('.gsi-nonvote').count(), 0);
-    console.log('PASS automatic startup, no floating window or selection UI, signature-only block cache');
+    console.log('PASS idle startup, sorting/scrolling/candle clicks send no requests; header click starts the current order without sorting');
 
     await page.evaluate(second => testCrossHair({time: second}), second);
     await page.frameLocator('#tradingview_fixture').locator('canvas').click({position: {x: 40, y: 40}});
@@ -105,7 +139,7 @@ new TradingView.widget({container:'chart'});
     await page.waitForFunction(() => document.querySelector('.head .gsi-value')?.title.includes('待查 0 笔'));
     assert(calls.some(call => call.method === 'getSignatureStatuses' && call.params[0].includes(D)));
     assert.equal(calls.filter(call => call.method === 'getBlock').length, 1);
-    console.log('PASS real candle click automatically locates and queries matching trades without enabling a switch');
+    console.log('PASS candle linking queries automatically after starting');
 
     // Recycled rows must query the new signature and reuse old successful results.
     await page.locator('.row a').first().evaluate((a, signature) => { a.href = `https://solscan.io/tx/${signature}`; }, D);
@@ -181,9 +215,15 @@ new TradingView.widget({container:'chart'});
     await until(() => calls.some(call => call.method === 'getBlock' && call.params[0] === 789));
     await page.evaluate(() => history.pushState({}, '', '/sol/token/NewToken'));
     await setRows([F]);
-    await page.waitForFunction(() => document.querySelector('.row .gsi-value')?.textContent === '排队中…');
+    await page.waitForFunction(() => document.querySelector('.row .gsi-value')?.textContent === '— / —');
+    assert.equal(await start.isEnabled(), true);
     failBlock = true;
+    staleRateLimit = true;
     releaseBlock(); delayedBlock = null;
+    await page.waitForTimeout(1700);
+    assert.equal(calls.filter(call => call.method === 'getBlock' && call.params[0] === 789).length, 1);
+    assert(!calls.some(call => call.method === 'getSignatureStatuses' && call.params[0].includes(F)));
+    await start.click();
     await page.waitForFunction(() => document.querySelector('.row .gsi-column')?.dataset.state === 'error');
     const failures = calls.filter(call => call.method === 'getBlock' && call.params[0] === 999).length;
     await page.waitForTimeout(1000);
@@ -191,7 +231,7 @@ new TradingView.widget({container:'chart'});
     await completed(1); // Automatic retry after the 15-second backoff.
     assert.equal(await page.locator('.row .gsi-value').innerText(), '999 / 0');
     assert.equal(calls.filter(call => call.method === 'getBlock' && call.params[0] === 999).length, 2);
-    console.log('PASS route change during an in-flight read and automatic delayed retry');
+    console.log('PASS new token waits for start, stale 429 retries stop, and active-page failures retry automatically');
 
     const options = await context.newPage();
     await options.goto(`chrome-extension://${id}/options.html`);
@@ -212,9 +252,22 @@ new TradingView.widget({container:'chart'});
     await page.evaluate(() => history.pushState({}, '', '/'));
     await page.locator('.gsi-column').first().waitFor({state: 'detached'});
     await page.evaluate(token => history.pushState({}, '', `/sol/token/${token}`), token);
+    await start.click();
     await completed(1);
     assert.equal(await page.locator('#gsi-panel, #gsi-launcher').count(), 0);
     console.log('PASS rejected transaction writes and SPA route changes');
+
+    await page.reload();
+    await start.waitFor();
+    const idleCalls = calls.length, idleBundleCalls = bundleCalls.length;
+    await options.locator('#reset').click();
+    await options.waitForFunction(() => document.getElementById('rpc').value === 'https://api.mainnet-beta.solana.com/'
+      && !document.getElementById('reset').disabled);
+    await page.waitForTimeout(1700);
+    assert.equal(calls.length, idleCalls);
+    assert.equal(bundleCalls.length, idleBundleCalls);
+    assert.equal(await start.isEnabled(), true);
+    console.log('PASS reload resets activation and RPC settings do not start an idle page');
 
     await fs.mkdir(path.join(root, 'test-results'), {recursive: true});
     await page.screenshot({path: path.join(root, 'test-results/automatic-columns.png')});

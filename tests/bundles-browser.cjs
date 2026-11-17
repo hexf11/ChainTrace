@@ -46,9 +46,13 @@ const fixture = txs => `<!doctype html><meta charset="utf-8"><style>body{backgro
     await context.route('https://gmgn.ai/**', route => route.fulfill({contentType: 'text/html', body: fixture(rows)}));
     const page = await context.newPage();
     const done = count => page.waitForFunction(count => document.querySelectorAll('.row .gsi-column[data-state="done"]').length === count, count);
-    const open = async txs => { rows = txs; await page.goto(`https://gmgn.ai/sol/token/${txs[0]}`); await done(txs.length); };
-    const setRows = async txs => {
+    const open = async txs => {
+      rows = txs; await page.goto(`https://gmgn.ai/sol/token/${txs[0]}`);
+      await page.locator('.gsi-start-query').click(); await done(txs.length);
+    };
+    const setRows = async (txs, start = false) => {
       await page.locator('.g-table-recycler-scroll').evaluate((el, html) => { el.innerHTML = html; }, txs.map(rowHTML).join(''));
+      if (start) await page.locator('.gsi-start-query').click();
       await done(txs.length);
     };
 
@@ -129,7 +133,7 @@ const fixture = txs => `<!doctype html><meta charset="utf-8"><style>body{backgro
     const deadline = Date.now() + 10000;
     while (!lookups.includes(904)) { if (Date.now() > deadline) throw new Error('Missing delayed lookup'); await page.waitForTimeout(100); }
     await page.evaluate(() => history.pushState({}, '', '/sol/token/next-token'));
-    await setRows([M, N]);
+    await setRows([M, N], true);
     release(); delay = null;
     await page.waitForFunction(() => document.querySelectorAll('[data-gsi-group-kind="bundle"]').length === 2);
     assert.equal(await page.locator('.gsi-group-label').getAttribute('href'), `https://explorer.jito.wtf/bundle/${'e'.repeat(64)}`);

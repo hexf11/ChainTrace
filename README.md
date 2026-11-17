@@ -10,14 +10,18 @@ A lightweight Chrome extension for automatic Solana Slot / Index lookup and veri
 
 ## 功能
 
-- **自动查询**：按顺序查询当前可见交易的 Slot / Index，滚动后自动补查，结果直接显示在活动列表。
-- **K 线联动**：点击 1s K 线，自动定位、突出显示并查询该秒的活动。
+- **点击开启**：进页面默认不查询，排好序后点击 `Slot / Index` 旁的「开始查询」，再按当前顺序自动查询和滚动补查。
+- **K 线联动**：开启查询后点击 1s K 线，自动定位、突出显示并查询该秒的活动。
 - **同笔分组**：Slot 和 Index 都相同的多条活动用同色框线标为「同笔」。
 - **Jito Bundle**：核对 Jito 归属、完整成员和区块顺序后，仅在当前活动列表可见至少两笔不同交易时画金色框；点击可查看官方来源。
 - **精简设置**：点击工具栏图标，只显示 RPC 地址、保存、测试连接和恢复默认。
 - **只读运行**：不连接钱包、不签名、不发送交易，无遥测，无运行时第三方依赖。
 
 ### 活动列表
+
+![点击开始查询](docs/images/start-query.png)
+
+先调整活动列表排序，再点击标题旁的「开始查询」。刷新或切换代币后重新等待点击。
 
 ![Jito Bundle 活动框线示例](docs/images/jito-bundles.png)
 
@@ -34,7 +38,7 @@ A lightweight Chrome extension for automatic Solana Slot / Index lookup and veri
 1. 下载 [最新安装包 chaintrace-chrome.zip](https://github.com/hexf11/ChainTrace/releases/latest/download/chaintrace-chrome.zip) 并解压。
 2. 打开 `chrome://extensions`，开启右上角「开发者模式」。
 3. 点击「加载已解压的扩展程序」，选择包含 `manifest.json` 的 `chaintrace-chrome` 文件夹。
-4. 刷新 GMGN 的 Solana 代币详情页，活动列表会自动查询。
+4. 刷新 GMGN 的 Solana 代币详情页，调整活动列表排序，再点击 `Slot / Index` 旁的「开始查询」。
 5. 将链序固定到工具栏，点击图标即可设置自己的主网 RPC。
 
 也可以克隆源码后直接加载仓库根目录，无需构建：
@@ -50,6 +54,10 @@ git clone https://github.com/hexf11/ChainTrace.git
 
 Slot 是区块所在的槽位，Index 是交易在完整区块中的原始位置，**从 0 开始**。
 查询使用已最终确认的数据，因此新交易可能需要稍等。失败查询会自动退避重试。
+
+每个页面初始都等待点击，不发送 RPC 或 Jito 索引查询。开启后按钮显示「已开启」，
+列表更新、滚动和 K 线联动继续自动查询。刷新页面或切换代币会重置为等待状态，
+开始状态不跨页面保存；修改 RPC 设置不会自动开启尚未开始的页面。
 
 默认公共 RPC 可能限流或不支持历史查询；自定义主网节点需支持 `getGenesisHash`、
 `getSignatureStatuses`、`getTransaction` 和 `getBlock`。RPC 设置保存后自动应用到已打开的页面。
@@ -85,7 +93,7 @@ npm run package
 
 Linux CI 使用 `npx playwright install --with-deps chromium`。
 浏览器测试通过独立临时配置加载真实扩展，使用 GMGN、RPC 与 Jito 测试夹具，不读取个人浏览器配置。
-测试覆盖自动排队、滚动和虚拟列表、K 线联动、RPC 切换、同笔分组及 bundle 核验。
+测试覆盖点击前零请求、按当前排序启动、切换代币后停止旧重试、滚动和虚拟列表、K 线联动、RPC 切换、同笔分组及 bundle 核验。
 GMGN 的页面结构和图表接口可能变化；夹具测试不代表已覆盖所有线上页面或节点。
 
 打包产物为 `dist/chaintrace-chrome.zip` 和 `dist/SHA256SUMS`。

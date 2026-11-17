@@ -2,6 +2,10 @@
 .gsi-column[data-state="done"] .gsi-value{color:#73e6b5}
 .gsi-column[data-state="error"] .gsi-value{color:#f3aa6d;cursor:help}
 .gsi-value{overflow:hidden;text-overflow:ellipsis}
+.gsi-start-query{flex-shrink:0;margin:0;padding:2px 6px;border:1px solid #3d8063;border-radius:4px;background:#1e3d31;color:#73e6b5;font:11px/16px system-ui,sans-serif;white-space:nowrap;cursor:pointer}
+.gsi-start-query:hover:not(:disabled){background:#2a5341}
+.gsi-start-query:focus-visible{outline:2px solid #73e6b5;outline-offset:2px}
+.gsi-start-query:disabled{border-color:#354238;background:transparent;color:#8ba295;cursor:default}
 .gsi-row>[data-testid^="table-cell-"]{min-width:0!important;flex-shrink:1!important}
 .gsi-head>[data-testid^="table-sort-"]{min-width:0!important;flex-shrink:1!important}
 [data-gsi-second-match="true"]{box-shadow:inset 3px 0 #73e6b5;background:rgba(70,184,125,.10)!important}

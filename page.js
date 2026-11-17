@@ -477,18 +477,19 @@
   let route = '';
   let busy = false;
   let generation = 0;
-  let message = '自动查询已开启，等待页面交易…';
+  let queryEnabled = false;
+  let message = '先调整排序，再点击「开始查询」';
   let autoTimer = null, autoWakeAt = 0, cooldownAt = 0;
-  let rpcClient = createClient(endpoint, extensionTransport);
+  let rpcClient = null;
   let verifiedEndpoint = '';
   const queue = new Map();
   const results = new Map();
   const blocks = new Map();
   const bundleJobs = new Map();
   let bundleBusy = false, bundleTimer = null, bundleWakeAt = 0, bundleCooldownAt = 0;
-  const link = {enabled: true, onlySecond: false, filterApplied: false, seeking: false, seekSerial: 0,
+  const link = {enabled: false, onlySecond: false, filterApplied: false, seeking: false, seekSerial: 0,
     second: null, serial: 0, loading: false, signatures: new Set(), complete: false, savedFilter: null, note: ''};
-  bridge.enabled = true;
+  bridge.enabled = false;
 
   const tokenAddress = () => location.pathname.match(/\/sol\/token\/([^/]+)/)?.[1] || '';
   function componentTrades(element, maxParents = 8) {
@@ -739,6 +740,27 @@
   function extensionTransport(revision, data) {
     return extension.request('rpc', {revision, data});
   }
+  function pageClient() {
+    const clientGeneration = generation, clientRoute = route;
+    return createClient(endpoint, (revision, data) => {
+      // Check on every send, including a retry after a 429 backoff. A previous
+      // page's sleeping client must not resume requests on a new, idle page.
+      if (!queryEnabled || generation !== clientGeneration || location.pathname !== clientRoute) {
+        throw new Error('查询未开启或页面已切换');
+      }
+      return extensionTransport(revision, data);
+    });
+  }
+  function startQueries() {
+    refresh(); // A SPA navigation may have happened before the observer ran.
+    if (queryEnabled || !activeRoute()) return;
+    queryEnabled = true;
+    link.enabled = true; bridge.enabled = true;
+    rpcClient = pageClient();
+    message = '自动查询已开启，等待页面交易…';
+    refresh();
+    bridge.discover();
+  }
 
   function rowSignature(row) {
     for (const a of row.querySelectorAll(`${TIME} a[href],a[href*="/tx/"]`)) {
@@ -777,7 +799,7 @@
     const value = cell.querySelector('.gsi-value');
     if (value.textContent !== text) value.textContent = text;
     value.title = result?.error || (state === 'done' ? `Slot ${result.slot}，Index ${result.index}（从 0 开始）\n${signature}` : signature);
-    if (state === 'done' && !result.bundle) {
+    if (queryEnabled && state === 'done' && !result.bundle) {
       const job = bundleJobs.get(result.slot);
       value.title += `\nJito Bundle：${job?.state === 'checked' ? '未查到可确认的归属（不代表没有 bundle）'
         : job?.state === 'error' ? job.error : '正在自动核对归属…'}`;
@@ -846,13 +868,15 @@
     if (nextRoute !== route) {
       route = nextRoute;
       generation++;
+      queryEnabled = false; link.enabled = false; bridge.enabled = false;
+      rpcClient = null;
       queue.clear(); results.clear(); cooldownAt = 0;
       bundleJobs.clear(); clearTimeout(bundleTimer); bundleTimer = null;
       clearTimeout(autoTimer); autoTimer = null;
       link.serial++; link.loading = false; link.second = null; link.complete = false;
       link.seekSerial++; link.seeking = false; link.filterApplied = false;
       link.savedFilter = null; link.signatures.clear(); link.note = '';
-      message = '自动查询已开启，等待页面交易…';
+      message = '先调整排序，再点击「开始查询」';
     }
     if (!activeRoute()) {
       for (const row of document.querySelectorAll('[data-gsi-tx-group]')) clearGrouping(row);
@@ -860,7 +884,7 @@
       for (const row of document.querySelectorAll('[data-gsi-second-match]')) delete row.dataset.gsiSecondMatch;
       return;
     }
-    if (!link.loading && !link.seeking) {
+    if (queryEnabled && !link.loading && !link.seeking) {
       for (const row of visibleRows()) {
         const sig = rowSignature(row);
         enqueue(sig);
@@ -868,7 +892,7 @@
         if (result?.state === 'done' && !bundleJobs.has(result.slot) && blocks.has(result.slot)) queueBundle(result.slot, blocks.get(result.slot));
       }
     }
-    if (!link.loading) for (const signature of link.signatures) enqueue(signature);
+    if (queryEnabled && !link.loading) for (const signature of link.signatures) enqueue(signature);
     const tables = new Set();
     for (const row of document.querySelectorAll(ROW)) {
       const time = row.querySelector(TIME);
@@ -895,7 +919,20 @@
       if (time.nextElementSibling !== column) time.after(column);
       const value = column.querySelector('.gsi-value');
       value.textContent = 'Slot / Index';
-      value.title = `Index 从 0 开始 · 自动依次查询 · 待查 ${queue.size} 笔\n${message}\n${bridge.error || link.note || '点击 1s K 线自动定位并查询该秒交易'}\nRPC 设置请点击 Chrome 工具栏中的插件图标`;
+      value.title = `Index 从 0 开始 · ${queryEnabled ? '自动依次查询' : '等待点击开始查询'} · 待查 ${queue.size} 笔\n${message}\n${bridge.error || link.note || (queryEnabled ? '点击 1s K 线自动定位并查询该秒交易' : '开启后支持滚动补查和 1s K 线联动')}\nRPC 设置请点击 Chrome 工具栏中的插件图标`;
+      let button = column.querySelector('.gsi-start-query');
+      if (!button) {
+        button = document.createElement('button');
+        button.type = 'button'; button.className = 'gsi-start-query';
+        for (const name of ['pointerdown', 'mousedown', 'keydown', 'keyup']) {
+          button.addEventListener(name, event => event.stopPropagation());
+        }
+        button.addEventListener('click', event => { event.stopPropagation(); startQueries(); });
+        column.append(button);
+      }
+      button.textContent = queryEnabled ? '已开启' : '开始查询';
+      button.disabled = queryEnabled;
+      button.title = queryEnabled ? '自动查询已开启，滚动和 K 线联动会继续查询' : '先调整排序，再点击开始自动查询';
     }
     scheduleQuery();
     scheduleBundleQuery();
@@ -914,7 +951,7 @@
     return [...bundleJobs.values()].filter(job => job.attempts === 0 || needed.has(job.slot));
   }
   function scheduleBundleQuery() {
-    if (bundleBusy || !activeRoute()) return;
+    if (!queryEnabled || bundleBusy || !activeRoute()) return;
     const jobs = pendingBundleJobs();
     if (!jobs.length) return;
     const next = Math.max(Date.now() + 100, bundleCooldownAt, Math.min(...jobs.map(job => job.nextAt)));
@@ -923,12 +960,12 @@
     bundleTimer = setTimeout(() => { bundleTimer = null; queryBundle(); }, Math.max(0, next - Date.now()));
   }
   async function queryBundle() {
-    if (bundleBusy || !activeRoute() || location.pathname !== route) return;
+    if (!queryEnabled || bundleBusy || !activeRoute() || location.pathname !== route) return;
     if (Date.now() < bundleCooldownAt) { scheduleBundleQuery(); return; }
     const job = pendingBundleJobs().find(job => job.nextAt <= Date.now());
     if (!job) { scheduleBundleQuery(); return; }
     const batchGeneration = generation;
-    const current = () => generation === batchGeneration && location.pathname === route && bundleJobs.get(job.slot) === job;
+    const current = () => queryEnabled && generation === batchGeneration && location.pathname === route && bundleJobs.get(job.slot) === job;
     bundleBusy = true; job.state = 'loading';
     try {
       const response = await extension.request('bundles', {slot: job.slot});
@@ -962,12 +999,12 @@
   }
 
   function enqueue(signature) {
-    if (!signature || results.get(signature)?.state === 'done' || queue.has(signature)) return;
+    if (!queryEnabled || !signature || results.get(signature)?.state === 'done' || queue.has(signature)) return;
     queue.set(signature, {attempts: 0, retryAt: 0});
     results.set(signature, {state: 'queued'});
   }
   function scheduleQuery() {
-    if (busy || link.loading || !activeRoute() || !queue.size) return;
+    if (!queryEnabled || busy || link.loading || !activeRoute() || !queue.size) return;
     const next = Math.max(Date.now() + 100, cooldownAt, Math.min(...[...queue.values()].map(item => item.retryAt)));
     if (autoTimer !== null && autoWakeAt <= next) return;
     clearTimeout(autoTimer);
@@ -975,13 +1012,13 @@
     autoTimer = setTimeout(() => { autoTimer = null; queryNext(); }, Math.max(0, next - Date.now()));
   }
   async function queryNext() {
-    if (busy || link.loading || !activeRoute() || location.pathname !== route) return;
+    if (!queryEnabled || busy || link.loading || !activeRoute() || location.pathname !== route) return;
     const now = Date.now();
     if (now < cooldownAt) { scheduleQuery(); return; }
     const batch = [...queue].filter(([, item]) => item.retryAt <= now).slice(0, 64);
     if (!batch.length) { scheduleQuery(); return; }
     const batchGeneration = generation, batchEndpoint = endpoint;
-    const current = () => batchGeneration === generation && location.pathname === route;
+    const current = () => queryEnabled && batchGeneration === generation && location.pathname === route;
     const rpc = rpcClient;
     const requested = batch.map(([signature]) => signature);
     const failures = [], failedBlocks = new Map();
@@ -1076,9 +1113,9 @@
     generation++;
     queue.clear(); results.clear(); blocks.clear(); cooldownAt = 0;
     bundleJobs.clear(); clearTimeout(bundleTimer); bundleTimer = null;
-    rpcClient = createClient(endpoint, extensionTransport); verifiedEndpoint = '';
+    rpcClient = queryEnabled ? pageClient() : null; verifiedEndpoint = '';
     clearTimeout(autoTimer); autoTimer = null;
-    message = 'RPC 已更新，正在自动查询…';
+    message = queryEnabled ? 'RPC 已更新，正在自动查询…' : 'RPC 已更新，点击「开始查询」后生效';
     refresh();
   };
   // Ignore our own text/style changes. Observe href changes because GMGN recycles rows.
